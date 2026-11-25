@@ -1,0 +1,11 @@
+# Encoder TerraFM-B congelado (PLANO §4.1). Valores fixados em 25/11/2026.
+upstream:
+  repo: https://github.com/mbzuai-oryx/TerraFM
+  commit: e245c347ab1ef94e8d14b40dcd5f12d310b03f32
+weights:
+  url: https://huggingface.co/MBZUAI/TerraFM/resolve/86f62795ff0e8dfae729e170e0ed82fb3e07ec9e/TerraFM-B.pth
+  path: data/weights/TerraFM-B.pth
+  size_bytes: 451862010
+  sha256: 8bdb6a4cfd707a09d79f4790119daa9d76bb316b6ea756c6eb305f99d1797a06
+# Aplica a LayerNorm final aos tokens de patch, como forward() e extract_feature() do upstream.
+norm_tokens: true
