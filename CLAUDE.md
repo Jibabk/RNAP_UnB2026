@@ -25,7 +25,8 @@ O projeto fiscaliza a restauração de APPs no Conservador das Águas, em Extrem
 - **Caminhos** vêm sempre dos YAML em `configs/`; nada de caminho absoluto no código.
 
 ## Ambiente
-- **Sistema:** Windows, conda env `rnap` (Python 3.11, PyTorch com CUDA), GPU RTX 2070 Max-Q de 8 GB. Use fp16 na inferência e lotes pequenos.
+- **Sistema:** Windows, conda env `rnap` (Python 3.11, PyTorch 2.14.1+cu126).
+- **Máquinas:** desenvolvimento e testes nesta máquina, com GTX 1650 de 4 GB; rodadas completas em outra máquina, com RTX 2070 Max-Q de 8 GB. Use fp16 na inferência e lotes pequenos.
 - **Mamba:** use `mambapy` (PyTorch puro). O `mamba-ssm` não roda no Windows.
 - **Comandos** (atualizar ao fim da Fase 0):
   - `conda activate rnap`
@@ -38,11 +39,14 @@ O projeto fiscaliza a restauração de APPs no Conservador das Águas, em Extrem
   - Bandas: `B01 B02 B03 B04 B05 B06 B07 B08 B8A B09 B11 B12`, em uint16 com escala 1e-4 e nodata 0.
   - Auxiliares: `SCL`, `CLEAROB` (0 = sem observação limpa) e `PROVENANCE` (dia do ano da aquisição escolhida).
   - **Não há Sentinel-1 no BDC.**
-- **TerraFM** (`github.com/mbzuai-oryx/TerraFM`, branch `master`; pesos em `huggingface.co/MBZUAI/TerraFM`):
-  - `forward(x)` recebe **um sensor por vez** (2 canais = S1, 12 canais = S2) e devolve **só o token CLS**.
-  - O `forward` padrão usa o embedding **L1C**. Para L2A, chame `patch_embed(x, is_l2a=True)` num forward próprio.
-  - Tokens de patch: `get_intermediate_layers(x, n=1)` (196×768) ou `extract_feature(..., out_indices=[3,5,7,11])`.
-  - Não há normalização nem ordem de bandas documentadas; elas são escolhidas pela sondagem de sanidade (plano, 4.7).
+  - Os assets abrem sem token: um GET parcial de um COG respondeu 206 em 25/11/2026.
+- **TerraFM** (`github.com/mbzuai-oryx/TerraFM`, commit `e245c347` de 13/11/2026; pesos em `huggingface.co/MBZUAI/TerraFM`, revisão `86f62795`):
+  - Licença MIT para o código e os pesos; os trechos do DINO são Apache-2.0.
+  - `forward(x, is_l2a=False)` recebe **um sensor por vez** (2 canais = S1, 12 canais = S2) e devolve **só o token CLS**.
+  - Todos os métodos usam `is_l2a=False` (stem **L1C**) por padrão. Para o BDC (L2A), passe sempre `is_l2a=True`.
+  - Tokens de patch: `get_intermediate_layers(x, n=1, is_l2a=True, norm=True)` (196×768). Sem `norm=True`, eles saem antes da LayerNorm final.
+  - Normalização oficial: `normalize(x, "s2_l2a")` sobre DN brutos (refletância×10000, o uint16 do BDC sem aplicar a escala). O README desaconselha o z-score por conjunto de dados.
+  - Ordem das bandas (`S2_BANDS`): `B01…B08, B8A, B09, B11, B12`, a mesma do BDC.
   - O código público não tem a fusão S1/S2 por atenção cruzada.
 - **MapBiomas Coleção 11** (30 m, anual): 3 = Formação Florestal (alvo); 9 = Silvicultura (**não** é floresta nativa); 15 = Pastagem; 21 = Mosaico; 12 = Formação Campestre; 11 = Campo Alagado. O download pelo site está suspenso, e os dados saem pelo GEE.
 - **MambaSL** (`github.com/yoom618/MambaSL`, MIT, base TSLib) classifica a **série inteira**. Aqui, o pooling adaptativo é aplicado por janela anual.

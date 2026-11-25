@@ -15,6 +15,8 @@
 | MVP incremental | Primeiro: S2 em composições, treino em Extrema e mapa anual. Depois, em ordem de prioridade: datas reais de aquisição, saída por trajetória, Sentinel-1 e séries por aquisição. |
 | Imagens do Brazil Data Cube (BDC), cubo `S2-16D-2` | O BDC **não tem Sentinel-1**: nenhuma coleção S1 foi encontrada. O MVP usa só o Sentinel-2. A hipótese H2 (S1+S2) vira extensão, com o S1 RTC do Planetary Computer, ou trabalho futuro. |
 | Treino em Extrema e teste nas Posses | A sub-bacia das Posses tem só ~1.200 ha, o que dá 2–3 recortes de 224×224. Ela fica reservada para teste e fiscalização. O treino usa o resto do município. |
+| Normalização oficial do TerraFM (25/11) | O commit `e245c347` do upstream publicou `normalize(x, "s2_l2a")`, a ordem das bandas e a licença MIT. O wrapper recebe DN brutos e usa essa normalização; a sondagem da seção 4.7 só a confirma. |
+| Desenvolvimento nesta máquina, execução em outra (25/11) | Os testes rodam na GTX 1650 de 4 GB; as rodadas completas, em outra máquina, com RTX 2070 Max-Q de 8 GB. O `environment.yml` serve às duas, que são Turing (sm_75). |
 
 > **Impacto no artigo final.** O roteiro fala em S1+S2 e só nas Posses. O artigo terá de dizer que o MVP usa apenas S2 (BDC) e treina em Extrema. Se o S1 entrar como extensão, isso também precisa constar.
 
@@ -34,7 +36,7 @@
    - **MapBiomas**, como referência.
 3. Pelo menos duas ablações rodadas (A1 e A2, seção 4.6).
 4. Há figuras para o artigo: mapas, ano de início, indicador por APP e exemplos de trajetórias.
-5. O repositório GitHub `ProjetoFinalRNAP_UnB2026` está publicado, com README de reprodução.
+5. O repositório GitHub `Jibabk/RNAP_UnB2026` está publicado, com README de reprodução.
 
 ---
 
@@ -45,8 +47,8 @@
 | Item | Escolha | Observação |
 |---|---|---|
 | Python | 3.11, num ambiente conda chamado `rnap` | Instalar GDAL e rasterio pelo conda-forge, não pelo pip. |
-| PyTorch | 2.x com CUDA 12.x | GPU RTX 2070 Max-Q, 8 GB. Inferência do TerraFM em fp16. |
-| Mamba | `mambapy` (PyTorch puro) | O `mamba-ssm` usado pelo MambaSL só roda em Linux com NVIDIA. Usar WSL2 só se o `mambapy` for lento demais. Com sequências de ~200 passos e d=128, o `mambapy` deve bastar. |
+| PyTorch | 2.14.1 com CUDA 12.6 (wheel `cu126`, pelo pip) | Desenvolvimento e testes na GTX 1650 de 4 GB; rodadas completas em outra máquina, com RTX 2070 Max-Q de 8 GB. Inferência do TerraFM em fp16. |
+| Mamba | `mambapy` 1.2.0 (PyTorch puro) | O `mamba-ssm` usado pelo MambaSL só roda em Linux com NVIDIA. Usar WSL2 só se o `mambapy` for lento demais. Com sequências de ~200 passos e d=128, o `mambapy` deve bastar. |
 | Dados geoespaciais | `pystac-client`, `odc-stac` (ou `stackstac`), `rasterio`, `rioxarray`, `xarray`, `zarr`, `geopandas`, `shapely`, `pyproj` | |
 | Treino e avaliação | `numpy`, `pandas`, `scikit-learn`, `ruptures`, `tqdm`, `pyyaml`, `matplotlib`, `tensorboard` | |
 | Opcional | `earthengine-api` (MapBiomas pelo GEE) e `planetary-computer` (S1 RTC, extensão) | |
@@ -117,12 +119,12 @@
 ## 4. Modelo e comparações
 
 ### 4.1 Encoder: TerraFM-B congelado
-- **Código:** `terrafm.py` copiado para `src/terrafm_temporal/encoders/third_party/`, com atribuição. O repositório não tem LICENSE; o card do Hugging Face diz apache-2.0. Pesos: `MBZUAI/TerraFM`, arquivo `TerraFM-B.pth`.
+- **Código:** `terrafm.py` copiado sem alterações para `src/terrafm_temporal/encoders/third_party/`, do commit `e245c347` (13/11/2026), com o LICENSE ao lado. Licença MIT para o código e os pesos; os trechos do DINO são Apache-2.0. Pesos: `MBZUAI/TerraFM`, arquivo `TerraFM-B.pth`.
 - **Cuidados com o código público:**
   - `forward()` aceita **um sensor por vez** (2 canais = S1, 12 = S2) e devolve **só o CLS**.
-  - O `forward()` padrão usa o embedding **L1C**. Para L2A, é preciso um forward próprio que chame `patch_embed(x, is_l2a=True)`.
-  - Os tokens de patch vêm de `get_intermediate_layers(x, n=1)` (196×768) ou de `extract_feature(..., out_indices=[3,5,7,11])` (mapas 14×14).
-- **Normalização e ordem de bandas:** não estão documentadas. Testar na Fase 2 (refletância ×1e-4 e z-score por banda) com uma sondagem linear de uma data (seção 4.7).
+  - Todos os métodos usam `is_l2a=False` (stem **L1C**) por padrão. Para L2A, passar `is_l2a=True`.
+  - Os tokens de patch vêm de `get_intermediate_layers(x, n=1, is_l2a=True, norm=True)` (196×768) ou de `extract_feature(..., out_indices=[3,5,7,11], is_l2a=True)` (mapas 14×14). Sem `norm=True`, os tokens saem antes da LayerNorm final.
+- **Normalização e ordem de bandas:** ambas são oficiais desde o commit `e245c347`. A entrada são DN brutos (refletância×10000, o uint16 do BDC sem aplicar a escala), normalizados com `normalize(x, "s2_l2a")`, na ordem `S2_BANDS` = `B01…B08, B8A, B09, B11, B12`, que é a mesma do BDC. O README desaconselha o z-score por conjunto de dados. A sondagem da seção 4.7 confirma essa escolha.
 - **Validade do token:** ≥50% de pixels limpos no patch de 16×16 (`CLEAROB>0` e SCL ∉ {0,1,3,8,9,10}).
 
 ### 4.2 Modelo proposto P (TerraFM-Temporal)
@@ -173,8 +175,8 @@ Para cada posição de token (14×14 por recorte):
 
 ### 4.7 Verificação de sanidade (antes de treinar qualquer coisa)
 - **Teste:** sondagem linear (regressão logística) sobre os tokens de **uma data**, com o rótulo "fração de floresta do MapBiomas no patch > 0,5".
-- **Critério:** a acurácia balanceada deve ficar claramente acima de 0,5 (meta: > 0,8). Essa verificação escolhe a normalização e confirma a ordem das bandas.
-- **Se falhar:** parar e investigar antes de seguir.
+- **Critério:** a acurácia balanceada deve ficar claramente acima de 0,5 (meta: > 0,8). Essa verificação confirma a normalização oficial e a ordem das bandas.
+- **Se falhar:** parar e investigar antes de seguir. A refletância ×1e-4 e o z-score por banda entram só como diagnóstico.
 
 ---
 
@@ -239,7 +241,7 @@ Cada uso entra no registro de IA com o modelo de cada agente.
 - **F0:** "Leia docs/PLANO_IMPLEMENTACAO.md. Crie a estrutura do repositório da seção 5, o environment.yml da seção 2 e o .gitignore. Não implemente lógica ainda."
 - **F0:** "Implemente encoders/terrafm_wrapper.py conforme a seção 4.1: carregar TerraFM-B, forward L2A com is_l2a=True e saída de tokens 196×768. Teste com tensor aleatório e com 1 recorte real."
 - **F1:** "Implemente data/bdc.py e scripts/01_download_bdc.py (seção 3.2) para baixar o mini-AOI de 2024 e salvar em Zarr. Depois rode para Extrema 2017–2025 em segundo plano."
-- **F2:** "Implemente 04_extract_tokens.py e 05_sanity_probe.py (seções 4.1 e 4.7) e compare as duas normalizações."
+- **F2:** "Implemente 04_extract_tokens.py e 05_sanity_probe.py (seções 4.1 e 4.7) e confirme a normalização oficial (`normalize(x, "s2_l2a")`)."
 - **F3:** "Implemente B3 e P (seções 4.2 a 4.4) com treino em Extrema, validação por blocos e teste nas Posses. Comece pelo mini-AOI."
 
 ---
@@ -281,9 +283,9 @@ Cada uso entra no registro de IA com o modelo de cada agente.
 ---
 
 ## 9. Pendências a verificar na Fase 0
-1. Se o BDC exige token para baixar os assets do `S2-16D-2` e qual a forma de uso.
+1. Se o BDC exige token para baixar os assets do `S2-16D-2` e qual a forma de uso. → **Resposta (2026-11-25):** não exige. Um GET parcial (`Range: bytes=0-16383`) do COG `S2-16D_V2_029030_20240727_B04.tif` respondeu 206 sem token. Fonte: https://data.inpe.br/bdc/data/s2-16d/v2/029/030/2024/07/27/S2-16D_V2_029030_20240727_B04.tif
 2. O caminho do MapBiomas Coleção 11: asset no GEE, os anos (inclui 2025?) e as regras de exportação.
-3. A ordem das bandas do Major-TOM L2A e se ela coincide com a do BDC: `B01…B08, B8A, B09, B11, B12`.
+3. A ordem das bandas do Major-TOM L2A e se ela coincide com a do BDC: `B01…B08, B8A, B09, B11, B12`. → **Resposta (2026-11-25):** coincide. O `S2_BANDS` do `terrafm.py` é `B01…B08, B8A, B09, B11, B12`, igual à ordem do BDC. A ordem interna do Major-TOM não foi conferida, porque o upstream documenta a entrada do modelo. Fonte: https://github.com/mbzuai-oryx/TerraFM/blob/e245c347ab1ef94e8d14b40dcd5f12d310b03f32/terrafm.py#L29
 4. A disponibilidade da camada de APP do SICAR para Extrema e o polígono da sub-bacia das Posses.
 5. O arquivo do modelo no repositório do MambaSL: como foram feitos o kernel escalado, a remoção do D e o pooling adaptativo.
 6. A área exata do município e o número final de recortes, para recalcular o volume de dados.

@@ -15,7 +15,7 @@ Você implementa a parte de modelo do Projeto 2 (TerraFM-Temporal, RNAP 2026/2, 
 - Respostas, comentários e documentação em português. Código, identificadores e mensagens de commit em inglês.
 - Caminhos vêm só dos YAML em `configs/`. Nada de caminho absoluto no código.
 - O sistema é Windows. Rode Python com `conda run -n rnap --no-capture-output python ...`, porque o `conda activate` não persiste entre comandos.
-- GPU: RTX 2070 Max-Q de 8 GB. Use fp16 na inferência, lotes pequenos e acumulação de gradiente se faltar memória.
+- GPU: os testes rodam na GTX 1650 de 4 GB desta máquina; as rodadas completas, em outra máquina, com RTX 2070 Max-Q de 8 GB. Use fp16 na inferência, lotes pequenos e acumulação de gradiente se faltar memória.
 - Teste no mini-AOI (`configs/aoi.yaml: mini`, 1 recorte × 1 ano) e pare ali.
   - A extração de tokens e o treino na área toda não rodam aqui: escreva o comando no relatório.
   - O treino só roda um teste curto, por exemplo 1 época no mini-AOI.
@@ -26,7 +26,7 @@ Você implementa a parte de modelo do Projeto 2 (TerraFM-Temporal, RNAP 2026/2, 
 - Se a tarefa exigir conta, token ou credencial, pare e peça ao aluno.
 
 ## Escopo
-- `src/terrafm_temporal/encoders/`: `terrafm_wrapper.py` e `third_party/terrafm.py`, este copiado com atribuição. O repositório original não tem LICENSE; o card do Hugging Face diz apache-2.0.
+- `src/terrafm_temporal/encoders/`: `terrafm_wrapper.py` e `third_party/terrafm.py`, este copiado sem alterações do commit `e245c347`, com o LICENSE (MIT) ao lado.
 - `src/terrafm_temporal/models/`: `temporal_mamba.py`, `ltae.py`, `decoder.py` e `baselines.py`.
 - `src/terrafm_temporal/data/dataset.py`.
 - `src/terrafm_temporal/`: `train.py`, `evaluate.py`, `postprocess.py` e `utils.py`.
@@ -37,13 +37,14 @@ Você implementa a parte de modelo do Projeto 2 (TerraFM-Temporal, RNAP 2026/2, 
 ## Invariantes (PLANO §4)
 - **Encoder:**
   - o TerraFM-B fica congelado;
-  - use um forward L2A próprio, com `patch_embed(x, is_l2a=True)`; o `forward()` padrão usa L1C e devolve só o CLS;
-  - os tokens de patch saem de `get_intermediate_layers(x, n=1)` (196×768);
+  - a entrada são DN brutos, normalizados com `normalize(x, "s2_l2a")` do upstream;
+  - passe sempre `is_l2a=True`: o padrão de todos os métodos é o stem L1C, e o `forward()` devolve só o CLS;
+  - os tokens de patch saem de `get_intermediate_layers(x, n=1, is_l2a=True, norm=True)` (196×768);
   - os tokens são pré-calculados em fp16 e gravados em disco;
   - token válido: ≥50% de pixels limpos no patch de 16×16.
 - **A sondagem de sanidade (§4.7) é um portão.**
   - P e B3 só são treinados depois que ela passar (meta: acurácia balanceada > 0,8).
-  - É ela que escolhe a normalização (refletância ×1e-4 ou z-score por banda).
+  - Ela confirma a normalização oficial; a refletância ×1e-4 e o z-score por banda só entram como diagnóstico se ela falhar.
   - Abaixo de 0,7, pare e relate.
 - **Mamba:**
   - só `mambapy`, nunca `mamba-ssm`;
