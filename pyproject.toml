@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "terrafm-temporal"
+version = "0.0.0"
+requires-python = "==3.11.*"
+# As dependências ficam no environment.yml (conda env `rnap`), não aqui.
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "network: acessa a internet: STAC e COGs do BDC",
+    "weights: precisa de data/weights/TerraFM-B.pth",
+    "gpu: precisa de CUDA",
+]
