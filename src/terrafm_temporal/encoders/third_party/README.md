@@ -16,6 +16,3 @@ Esta pasta guarda uma cópia **sem nenhuma alteração** de dois arquivos do Ter
 
 ## Nota sobre o arquivo
 `_no_grad_trunc_normal_` chama `warnings.warn` sem importar `warnings`. O ramo só roda na inicialização com média fora de [a, b], o que não acontece com os valores padrão; o arquivo foi mantido sem alterações.
-
-## Uso no projeto
-Não importe este módulo diretamente nos scripts: use `terrafm_temporal.encoders.terrafm_wrapper.TerraFMEncoder`, que fixa a entrada em DN, o stem L2A e a saída de tokens de patch.
