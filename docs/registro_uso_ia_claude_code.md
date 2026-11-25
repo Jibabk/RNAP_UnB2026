@@ -6,6 +6,8 @@ Objetivo: documentar de forma específica e detalhada o uso de modelos de IA no 
 | Ferramenta / modelo | Fornecedor | Para que foi usada |
 |---|---|---|
 | Claude Code (extensão do VS Code), modelo `claude-opus-5-5` | Anthropic | Planejamento e configuração dos agentes do projeto |
+| Subagentes do Claude Code, alias `sonnet` (Claude Sonnet 5.5, conforme o `Co-Authored-By` dos commits) | Anthropic | Implementação e revisão de cada tarefa da F0 |
+| Subagente `web-fetch` do Claude Code, alias `haiku` | Anthropic | Tentativa de ler PDFs de fontes na F0 (sem sucesso) |
 
 ## Entradas
 
@@ -101,3 +103,75 @@ Objetivo: documentar de forma específica e detalhada o uso de modelos de IA no 
     - `earthengine-api` incluído e `planetary-computer` excluído;
     - `pyproject.toml`, `configs/model/terrafm.yaml` e `scripts/00_download_weights.py`, fora do §5;
     - âncora `/data/` no `.gitignore`.
+
+### [2026-11-25] Execução do plano da F0 pelo orquestrador
+- **Etapa:** ambiente
+- **Ferramenta:** Claude Code (VS Code), modelo `claude-opus-5-5` na sessão principal.
+  - A sessão principal despachou o agente `orchestrator` (`claude-opus-5-5`). Ele seguiu a skill `superpowers:subagent-driven-development` e consultou 3 vezes a ferramenta `advisor`.
+  - O orquestrador fez 20 despachos de subagentes (lista abaixo). A sessão principal usou a skill `registro-uso-ia` e a ferramenta `Monitor`.
+- **Pedido do aluno:**
+  - "execute o plano docs/superpowers/plans/2026-11-25-f0-ambiente.md com o orchestrator";
+  - depois: "ok, me avise quando terminar".
+- **O que a IA fez:**
+  - **Sessão principal, antes do despacho:**
+    - leu o início do plano e o `.claude/agents/orchestrator.md`;
+    - verificou que o `conda` não está no PATH dos shells, mas responde pelo caminho completo `C:\Users\jeanb\miniforge3\Scripts\conda.exe` (`conda 26.9.4`);
+    - despachou o orquestrador com esse contexto. A instrução foi chamar o conda pelo caminho completo, sem alterar o PATH do sistema nem o perfil.
+  - **Orquestrador, primeira etapa:**
+    - criou a branch `f0-ambiente`;
+    - executou as Tarefas 1, 2, 3 (Passos 1–5), 6 e 7, com um implementador e um revisor por tarefa;
+    - parou na parada obrigatória 5, o download dos pesos.
+  - **Sessão principal, download dos pesos:**
+    - leu `scripts/00_download_weights.py` e `download_file` (`src/terrafm_temporal/utils.py`);
+    - rodou o download em segundo plano, com log em `outputs/logs/f0_download_weights.log`, e acompanhou o tamanho do `.part` com um monitor;
+    - conferiu com `sha256sum`: `8bdb6a4cfd707a09d79f4790119daa9d76bb316b6ea756c6eb305f99d1797a06`, 451862010 bytes, iguais aos fixados no plano.
+  - **Orquestrador, retomada:**
+    - Tarefa 3, Passo 7: `1 passed`, rodado pelo implementador da Tarefa 4;
+    - Tarefas 4, 5 e 8;
+    - revisão final da branch (`opus`) e uma onda de correções de texto (M1 e M2).
+  - **Despachos do orquestrador** (agente/modelo):
+    - T1, T2 e T8: implementador `general-purpose`/sonnet;
+    - T3, T4 e T7: implementador `model-engineer`/sonnet;
+    - T5 e T6: implementador `geo-data`/sonnet;
+    - um revisor `general-purpose`/sonnet por tarefa;
+    - T6: um `web-fetch`/haiku, que não conseguiu ler os PDFs;
+    - revisão final `general-purpose`/opus;
+    - onda de correções: fixer e re-revisão `general-purpose`/sonnet.
+  - **Commits** na `f0-ambiente`, de `86582ae` a `6b5935e` (9 commits, todos com `Co-Authored-By: Claude Sonnet 5.5`):
+    - Tarefa 1: `CLAUDE.md`, `docs/PLANO_IMPLEMENTACAO.md` e `.claude/agents/model-engineer.md`;
+    - Tarefa 2: esqueleto do repositório, `environment.yml`, `.gitignore`, `pyproject.toml` e env `rnap`;
+    - Tarefa 3: `src/terrafm_temporal/utils.py`, `configs/model/terrafm.yaml` e `scripts/00_download_weights.py`;
+    - Tarefa 4: `terrafm.py` e LICENSE do upstream (`e245c347`) em `encoders/third_party/`, e o wrapper `TerraFMEncoder`;
+    - Tarefa 5: configs do mini-AOI e do BDC, e o teste com 1 janela real;
+    - Tarefas 6 e 7: respostas da §9;
+    - Tarefa 8: comandos no `CLAUDE.md`.
+  - **Sessão principal, conferência final no HEAD `6b5935e`:**
+    - `pytest tests -q -rs` deu `61 passed in 45.31s`, sem skip, nesta máquina (GTX 1650). O log está em `outputs/logs/f0_pytest_final.log`;
+    - `git ls-files | grep -E "\.pth$|\.zarr|^data/|^outputs/"` não devolveu nenhuma linha;
+    - os 6 itens da §9 têm "Resposta"; 9.4 e 9.6 são parciais.
+  - Acrescentou esta entrada e as duas linhas da tabela-resumo.
+- **Resultado:**
+  - a F0 está implementada na branch `f0-ambiente`, ainda sem push e sem merge;
+  - o `TerraFMEncoder` gera tokens 196×768 de uma janela real do BDC (item `S2-16D_V2_029030_20240625`);
+  - os pesos estão em `data/weights/TerraFM-B.pth`, fora do git;
+  - o ledger do orquestrador está em `.superpowers/sdd/2026-11-25-f0-ambiente/progress.md`, fora do git.
+- **Verificação humana:** a preencher pelo aluno
+- **Limitações/erros:**
+  - **Fato errado ainda no `CLAUDE.md` e no PLANO (I1, revisão final):** as bandas estão "em uint16", mas os COGs do BDC estão gravados em int16, embora o STAC declare uint16. `PROVENANCE` é int16 com nodata −1. A correção não foi aplicada e espera a decisão do aluno. Enquanto isso, o teste da Tarefa 5 converte para uint16 depois de checar que não há negativos (R13).
+  - **Comando de teste no `CLAUDE.md` (M6):** com dois `-m`, o pytest só usa o último. Para combinar os dois, o certo é `-m "not network and not gpu"`.
+  - **Comparação fp16 × fp32:** o cosseno de 0,99999875 foi medido com DN sintéticos, não com dados reais. A comparação com dados reais fica para a F2.
+  - **Testes:** rodaram só nesta máquina, não na RTX 2070.
+  - **Desvio de TLS:** na Tarefa 6, o implementador `geo-data` tentou um `curl -k` ao SICAR, que desliga a verificação TLS. O classificador negou, e ele refez sem `-k`.
+  - **`pypdf`:** na Tarefa 6, o `pypdf` foi instalado com `pip install --target` numa pasta temporária, fora do env `rnap` e do repositório (R11).
+  - **Arquivos fora do lugar:** dois JSON do SNIRH foram gravados na raiz do repositório e retirados antes do commit.
+  - **Leitura dos PDFs:** o `web-fetch`/haiku não leu os PDFs da Embrapa e do PCJ. O orquestrador conferiu o 1.196,7 ha e o "1200 ha" com um script stdlib no scratchpad.
+  - **Decisões tomadas pela IA, e não pelo aluno** (rulings do ledger):
+    - adiantar as Tarefas 6 e 7 para antes das 4 e 5 (R7);
+    - gerar os briefs com awk, porque o `task-brief` da skill não reconhece títulos em português (R6);
+    - converter int16 para uint16 em `_read_window` (R13);
+    - usar `method="GET"` na busca STAC (R14);
+    - não aplicar o I1 (R16);
+    - manter o workspace `.superpowers/sdd/` (R15);
+    - triagem dos itens estacionados da revisão final (R18).
+  - **Ambiente:** o `conda init` continua pendente, e o `conda` não está no PATH dos shells.
+  - **Registro principal:** o `claude/registro-uso-ia.md` do Projeto "TCC Jean" não foi atualizado, porque as ferramentas de Projects não estão disponíveis no Claude Code.
