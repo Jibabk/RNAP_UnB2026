@@ -28,10 +28,12 @@ O projeto fiscaliza a restauração de APPs no Conservador das Águas, em Extrem
 - **Sistema:** Windows, conda env `rnap` (Python 3.11, PyTorch 2.14.1+cu126).
 - **Máquinas:** desenvolvimento e testes nesta máquina, com GTX 1650 de 4 GB; rodadas completas em outra máquina, com RTX 2070 Max-Q de 8 GB. Use fp16 na inferência e lotes pequenos.
 - **Mamba:** use `mambapy` (PyTorch puro). O `mamba-ssm` não roda no Windows.
-- **Comandos** (atualizar ao fim da Fase 0):
-  - `conda activate rnap`
-  - `python scripts/<NN>_<nome>.py --config configs/<arquivo>.yaml`
-  - `pytest tests -q`
+- **Comandos:**
+  - criar o ambiente: `conda env create -f environment.yml` e depois `conda run -n rnap --no-capture-output pip install -e . --no-deps`;
+  - terminal interativo: `conda activate rnap`;
+  - scripts: `conda run -n rnap --no-capture-output python scripts/<NN>_<nome>.py --config configs/<arquivo>.yaml`;
+  - pesos do TerraFM-B: `conda run -n rnap --no-capture-output python scripts/00_download_weights.py --config configs/model/terrafm.yaml`;
+  - testes: `conda run -n rnap --no-capture-output python -m pytest tests -q`. Sem rede, acrescente `-m "not network"`; sem GPU, `-m "not gpu"`.
 
 ## Fatos técnicos já verificados (não redescobrir)
 - **BDC:**
