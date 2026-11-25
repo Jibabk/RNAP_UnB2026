@@ -204,3 +204,20 @@ Objetivo: documentar de forma específica e detalhada o uso de modelos de IA no 
 - **Limitações/erros:**
   - O dtype foi conferido em um único item do BDC. Não foi verificado se todos os itens de 2017–2025 seguem o mesmo padrão.
   - "Sem negativos" vem do intervalo declarado no STAC (0 a 10000) e da checagem numa janela, no teste da Tarefa 5. Não foi conferido na imagem inteira.
+
+### [2026-11-25] Push e merge da F0
+- **Etapa:** ambiente
+- **Ferramenta:** Claude Code (VS Code), modelo `claude-opus-5-5`, com a skill `superpowers:finishing-a-development-branch`.
+- **Pedido do aluno:** "pode fazer o push e o merge".
+- **O que a IA fez:**
+  - Conferiu que `main` e `origin/main` estavam em `2736d86`, que é a base da `f0-ambiente`.
+  - Rodou `git push -u origin f0-ambiente`.
+  - Fez o merge da branch na `main` com `git merge --ff-only f0-ambiente`, em fast-forward e sem commit de merge.
+  - Rodou a suíte completa na `main` depois do merge: `61 passed in 55.23s`, sem skip. O log está em `outputs/logs/f0_pytest_merged_main.log`.
+  - Rodou `git push origin main` (`2736d86..ce08cd0`).
+  - Não apagou a branch local `f0-ambiente` nem o workspace `.superpowers/sdd/2026-11-25-f0-ambiente/`.
+- **Resultado:** `main`, `origin/main` e `origin/f0-ambiente` apontam para `ce08cd0`.
+- **Verificação humana:** a preencher pelo aluno
+- **Limitações/erros:**
+  - Esta entrada foi escrita depois do push e ainda não foi commitada.
+  - A entrada anterior diz "Não fez push nem merge", o que era verdade quando ela foi escrita.
