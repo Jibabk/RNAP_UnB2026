@@ -1,0 +1,395 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil]{babel}
+\usepackage{icomma}
+\usepackage[round,semicolon]{natbib}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{url}
+\usepackage{array}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,fit,backgrounds}
+
+\renewcommand{\IEEEkeywordsname}{Palavras-chave}
+% Marcador de pendências: tudo em vermelho deve ser preenchido/removido antes da entrega.
+\newcommand{\pendente}[1]{\textcolor{red}{[#1]}}
+% Citações no formato ABNT (AUTOR, ano), conforme o enunciado do projeto.
+\setlength{\bibsep}{3pt}
+
+\begin{document}
+
+\title{TerraFM-Temporal: Modelagem Temporal sobre um Modelo de Fundação Multissensor para Fiscalizar a Restauração de APPs no Programa Produtor de Água\\[4pt]
+\large Roteiro e Planejamento --- Projeto Individual 2}
+
+\author{\IEEEauthorblockN{Jean Bueno Karia}
+\IEEEauthorblockA{\textit{Matrícula: 211055290} \quad \textit{Turma: \pendente{preencher}} \\
+\textit{Redes Neurais e Aprendizado Profundo, 2026/2 --- Prof. Díbio}\\
+\textit{Departamento de Ciência da Computação (CiC)} \\
+\textit{Universidade de Brasília (UnB)}\\
+Brasília, Brasil \\
+211055290@aluno.unb.br}
+}
+
+\maketitle
+
+\begin{abstract}
+Este documento apresenta o roteiro e o planejamento do Projeto Individual 2 da disciplina de Redes Neurais e Aprendizado Profundo. O problema abordado é a fiscalização, por imagens de satélite, da restauração florestal em Áreas de Preservação Permanente (APPs) contratadas por programas de Pagamento por Serviços Ambientais (PSA) hídricos, como o Programa Produtor de Água, da Agência Nacional de Águas e Saneamento Básico, e o Conservador das Águas, de Extrema (MG). Hoje essa verificação depende de vistorias e de interpretação visual de imagens. O artigo-base é o TerraFM, modelo de fundação multissensor publicado na ICLR 2026, que funde imagens Sentinel-1 e Sentinel-2, mas processa uma única data por amostra. A inovação proposta é acoplar ao TerraFM congelado um codificador temporal, ciente das datas de aquisição e das lacunas causadas por nuvens, que produz um mapa anual de floresta a 10~m. Desse mapa derivam-se o ano de início da regeneração, a idade da floresta e um indicador de conformidade por APP. O plano prevê comparar o modelo proposto com o TerraFM aplicado data a data, com métodos clássicos de segmentação temporal e com redes temporais treinadas do zero.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Modelos de fundação, séries temporais de imagens de satélite, restauração florestal, pagamento por serviços ambientais, TerraFM, Sentinel-1, Sentinel-2
+\end{IEEEkeywords}
+
+% =====================================================================
+\section{Introdução}\label{sec:introducao}
+
+O Pagamento por Serviços Ambientais (PSA) remunera produtores rurais que adotam práticas que beneficiam a sociedade. No caso dos recursos hídricos, as práticas são a conservação do solo, a restauração da vegetação nativa e a proteção de nascentes e matas ciliares. No Brasil, o principal programa desse tipo é o Programa Produtor de Água, da Agência Nacional de Águas e Saneamento Básico~\citep{ana2018}. Seu caso pioneiro é o Conservador das Águas, do município de Extrema (MG), situado nas cabeceiras do Sistema Cantareira~\citep{pcj_conservador,viani2019}. No Conservador das Águas, uma das quatro metas que compõem o pagamento é a implantação e a manutenção de APPs, como matas ciliares, nascentes e topos de morro~\citep{pcj_conservador}. Essas áreas são protegidas pelo Código Florestal~\citep{brasil2012}.
+
+O pagamento é condicionado ao cumprimento das metas, o que exige verificar, contrato a contrato, se a área contratada de fato se tornou floresta. Os documentos públicos dos programas não descrevem um procedimento sistemático de monitoramento por imagem~\citep{ana2018,pcj_conservador}. O estudo mais próximo de uma avaliação por imagem é o de \citet{ruggiero2019}, que mapeou por interpretação visual 83 propriedades contratadas e 83 propriedades de controle do Produtor de Água e do Conservador das Águas. A autora encontrou um efeito positivo, porém lento, do PSA sobre a regeneração (cerca de 0,69\% da área do imóvel por ano). Esse tipo de avaliação manual é caro, demorado e difícil de repetir todos os anos.
+
+Ao mesmo tempo, modelos de fundação para observação da Terra tornaram-se uma alternativa promissora para tarefas com poucos rótulos. O TerraFM~\citep{danish2026terrafm}, publicado na ICLR 2026, aprende representações conjuntas de radar (Sentinel-1) e imagem óptica (Sentinel-2) e supera modelos anteriores em classificação e segmentação. Por outro lado, ele processa uma única data por amostra, enquanto a regeneração florestal é, por definição, uma trajetória ao longo de vários anos.
+
+\textbf{Pergunta de pesquisa.} \textit{Um codificador temporal treinado sobre as representações do TerraFM congelado identifica a regeneração florestal em APPs e estima o ano de início dessa regeneração com mais acurácia do que: (a) o próprio TerraFM aplicado data a data; (b) métodos clássicos de segmentação temporal; e (c) redes temporais treinadas do zero?}
+
+\textbf{Objetivo geral.} Desenvolver e avaliar um método de aprendizado profundo que, a partir de séries temporais Sentinel-1 e Sentinel-2, gere automaticamente um indicador de cumprimento das metas de restauração de APP de um programa de PSA hídrico.
+
+\textbf{Objetivos específicos:}
+\begin{enumerate}
+\item montar uma série de composições Sentinel-1/Sentinel-2 de 2017 a 2025 para a sub-bacia do Ribeirão das Posses (Extrema, MG), com rótulos fracos do MapBiomas e um conjunto de rótulos de referência interpretados manualmente;
+\item implementar o TerraFM-Temporal: o TerraFM congelado, seguido de um codificador temporal e de um decodificador que devolve a resolução de 10~m;
+\item comparar o modelo proposto com baselines clássicas e profundas e realizar ablações sobre os sensores, a codificação de datas e a quantidade de rótulos;
+\item agregar as previsões por APP e comparar o indicador de conformidade com uma avaliação de referência.
+\end{enumerate}
+
+% =====================================================================
+\section{Definição do Problema}\label{sec:problema}
+
+Seja $\mathcal{P}_j$ o conjunto de pixels de 10~m da APP $j$. Cada pixel $p$ possui uma série de observações $\{(\mathbf{x}_{p,t}, \tau_t)\}_{t=1}^{T}$, em que $\mathbf{x}_{p,t}$ reúne as bandas Sentinel-2 e a retroespalhamento Sentinel-1 (VV, VH) na composição $t$, e $\tau_t$ é a data correspondente. Algumas composições podem estar ausentes ou contaminadas por nuvens, o que é indicado por uma máscara $m_{p,t} \in \{0,1\}$.
+
+O alvo é a sequência anual $y_{p,a} \in \{0,1\}$, para $a = 1,\dots,Y$, que indica se o pixel é floresta no ano $a$. A partir da sequência prevista $\hat{y}_{p,a}$, define-se o ano de início da regeneração como o primeiro ano a partir do qual o pixel permanece floresta por pelo menos $k$ anos consecutivos, partindo de uma condição de não floresta:
+\begin{equation}
+a^{*}_p = \min\left\{a : \hat{y}_{p,a-1}=0,\ \hat{y}_{p,a'}=1\ \forall a' \in [a, a+k-1]\right\}.\label{eq:inicio}
+\end{equation}
+A idade da regeneração no ano de referência $A$ é $\mathrm{idade}_p = A - a^{*}_p$. Para cada APP $j$, calcula-se a fração coberta por floresta,
+\begin{equation}
+F_j = \frac{1}{|\mathcal{P}_j|}\sum_{p\in\mathcal{P}_j}\hat{y}_{p,A},\label{eq:conformidade}
+\end{equation}
+e emite-se um alerta de possível não conformidade quando $F_j < \lambda$. O limiar $\lambda$ e o número mínimo de anos $k$ serão definidos com base nas metas dos contratos e em uma análise de sensibilidade.
+
+\textbf{Escopo.} A série Sentinel permite observar diretamente regenerações iniciadas a partir de cerca de 2017. Como o Conservador das Águas é anterior a esse período, florestas já existentes no início da série terão a idade estimada a partir do mapa de idade da floresta secundária derivado do MapBiomas~\citep{silva2020}. Essa limitação será explicitada no artigo final.
+
+% =====================================================================
+\section{Trabalhos Relacionados}\label{sec:relacionados}
+
+\subsection{Artigo-base: TerraFM (ICLR 2026)}
+
+O TerraFM~\citep{danish2026terrafm} é um modelo de fundação autossupervisionado baseado no Vision Transformer (ViT)~\citep{dosovitskiy2021}, treinado em um esquema professor--aluno no estilo DINO~\citep{caron2021}. O modelo foi pré-treinado sobre mosaicos de 534$\times$534 pixels do conjunto Major-TOM, filtrado para cerca de 1,53 milhão de células e 18,7 milhões de recortes. As modalidades Sentinel-1 (VV, VH) e Sentinel-2 (L1C e L2A)~\citep{torres2012,drusch2012} são tratadas como visões complementares do mesmo local. Cada modalidade tem seu próprio \textit{patch embedding}, e uma atenção cruzada com cinco consultas aprendidas funde as modalidades em um único \textit{token} por posição. O treinamento combina aprendizado contrastivo local--global com um mecanismo de \textit{dual centering}, que regulariza o treino de acordo com a frequência das classes de cobertura, mitigando a cauda longa de classes raras. O modelo usa \textit{patches} de 16$\times$16 e entrada de 224$\times$224. Há duas versões, TerraFM-B (ViT-Base) e TerraFM-L (ViT-Large), com pesos públicos. O TerraFM-B foi pré-treinado por 150 épocas em 64 GPUs.
+
+Os autores relatam resultados superiores aos de modelos anteriores no GEO-Bench e no Copernicus-Bench. No GEO-Bench, por exemplo, o TerraFM-B atinge 98,1\% em m-EuroSAT e 32,8\% de mIoU em m-SA-Crop-Type com sondagem linear. Para este trabalho, a característica central é que cada amostra é um conjunto co-registrado de modalidades de \textbf{uma única data}. O modelo não possui codificação temporal explícita, e a amostragem de uma janela de quatro meses por célula serve apenas para selecionar imagens, não para formar uma sequência de entrada.
+
+\subsection{Outros trabalhos da ICLR 2026}
+
+O MambaSL~\citep{jung2026mambasl} redesenha minimamente um modelo de espaço de estados seletivo~\citep{gu2023mamba} de uma única camada para a classificação de séries temporais e alcança o estado da arte nos 30 conjuntos do UEA. No entanto, ele não foi avaliado com dados de satélite. O PYRREGULAR~\citep{spinnato2026pyrregular} propõe um formato unificado e um conjunto de 34 bases para a classificação de séries temporais irregulares, situação análoga à das séries de imagens ópticas com datas perdidas por nuvens. O SelvaBox~\citep{baudchon2026selvabox} disponibiliza mais de 83 mil copas de árvores tropicais anotadas em imagens de drone, inclusive de florestas secundárias e plantios de espécies nativas. Neste trabalho, o MambaSL e o PYRREGULAR fundamentam o projeto do codificador temporal, e o SelvaBox é citado como possível fonte de validação de campo em trabalhos futuros.
+
+\subsection{Aprendizado profundo para séries temporais de imagens}
+
+A revisão de \citet{miller2024} sintetiza o uso de redes convolucionais temporais, recorrentes e baseadas em atenção sobre séries temporais de imagens de satélite. Entre as arquiteturas mais usadas como referência estão a TempCNN~\citep{pelletier2019} e a L-TAE~\citep{garnot2020ltae}, que codifica a data de aquisição na atenção temporal. No Brasil, \citet{werner2024} compararam Random Forest, TempCNN, ResNet e L-TAE no mapeamento de sistemas de integração lavoura-pecuária. A TempCNN obteve a melhor acurácia, com pequena margem, e o Random Forest ficou próximo dela em paisagens de talhões grandes, o que reforça a necessidade de baselines clássicas. O pacote sits~\citep{simoes2021} oferece uma implementação de referência desses classificadores para cubos de dados brasileiros. \citet{silvafilho2024} trataram a diferença entre a resolução dos rótulos (30~m) e a das imagens (10~m) ao mapear a vegetação do Cerrado com dados SAR e ópticos.
+
+\subsection{Detecção de mudança e idade da floresta secundária}
+
+Os algoritmos de segmentação temporal LandTrendr~\citep{kennedy2010} e CCDC~\citep{zhu2014} detectam o momento, a magnitude e a direção das mudanças em séries Landsat e são comparados por \citet{pasquarella2022}. \citet{zhang2023} combinaram quatro desses algoritmos para estimar a idade da floresta secundária, com erro médio de cerca de três anos. No Brasil, \citet{silva2020} produziram mapas anuais de idade da floresta secundária a partir das coleções do MapBiomas~\citep{souza2020}. Esses mapas serão usados como rótulos fracos neste trabalho.
+
+\subsection{Fiscalização de PSA e restauração}
+
+\citet{viani2019} discutem lições do Produtor de Água na Mata Atlântica. \citet{toto2025} estimaram, com pareamento e diferenças-em-diferenças sobre mapas de cobertura, o efeito do Pacto pela Restauração da Mata Atlântica. \citet{ruggiero2019} avaliou o Produtor de Água e o Conservador das Águas por interpretação visual. Uma busca por trabalhos próximos, feita com a ferramenta FastTrack Literature, não encontrou estudos que combinassem modelos de fundação geoespaciais com codificação temporal para verificar contratos de restauração em PSA. Essa busca deverá ser refeita antes da entrega final.
+
+% =====================================================================
+\section{Inovação Proposta}\label{sec:inovacao}
+
+\subsection{O que é proposto}
+
+A inovação é o \textbf{TerraFM-Temporal} (Fig.~\ref{fig:pipeline}): o codificador do TerraFM é mantido congelado e aplicado separadamente a cada composição da série. Sobre a sequência resultante de \textit{tokens}, é treinado um codificador temporal leve, que recebe a data de cada composição e uma máscara de datas ausentes. Um decodificador recupera então a resolução de 10~m e produz um mapa anual de floresta, do qual derivam o ano de início, a idade e o indicador de conformidade por APP (Seção~\ref{sec:problema}). A Tabela~\ref{tab:comparacao} contrapõe o uso original do TerraFM à proposta.
+
+\begin{figure*}[t]
+\centering
+\begin{tikzpicture}[
+  node distance=4mm and 5mm,
+  bloco/.style={draw, rounded corners=2pt, align=center, font=\footnotesize, minimum height=11mm, text width=27mm, fill=white},
+  novo/.style={bloco, fill=orange!15, draw=orange!70!black, thick},
+  base/.style={bloco, fill=blue!8, draw=blue!60!black},
+  seta/.style={-{Stealth[length=2mm]}, thick}
+]
+\node[bloco] (dados) {Séries Sentinel-1 + Sentinel-2\\$T$ composições, 2017--2025\\recortes 224$\times$224};
+\node[base, right=of dados] (fm) {\textbf{TerraFM-B congelado}\\aplicado a cada data\\(ICLR 2026)};
+\node[bloco, right=of fm] (tok) {\textit{Tokens} por data\\$14\times14\times d$\\(pré-calculados)};
+\node[novo, right=of tok] (temp) {\textbf{Codificador temporal}\\L-TAE ou Mamba\\+ data $\tau_t$ + máscara $m_t$};
+\node[novo, right=of temp] (dec) {\textbf{Decodificador}\\FPN leve + bandas\\originais a 10~m};
+\node[bloco, below=7mm of dec] (mapa) {Mapa anual\\floresta / não floresta\\$\hat{y}_{p,a}$, $a=1..Y$};
+\node[novo, left=of mapa] (pos) {\textbf{Pós-processamento}\\ano de início $a^{*}_p$\\e idade (Eq.~\ref{eq:inicio})};
+\node[novo, left=of pos] (app) {\textbf{Agregação por APP}\\fração $F_j$ (Eq.~\ref{eq:conformidade})\\alerta se $F_j<\lambda$};
+\node[bloco, left=of app] (rot) {Rótulos fracos (MapBiomas)\\+ rótulos de referência\\(treino \textit{weak-to-gold})};
+\draw[seta] (dados) -- (fm);
+\draw[seta] (fm) -- (tok);
+\draw[seta] (tok) -- (temp);
+\draw[seta] (temp) -- (dec);
+\draw[seta] (dec) -- (mapa);
+\draw[seta] (mapa) -- (pos);
+\draw[seta] (pos) -- (app);
+\draw[seta, dashed] (rot.north) |- ([yshift=-3mm]temp.south) -- (temp.south);
+\end{tikzpicture}
+\caption{Visão geral do TerraFM-Temporal. Em azul, o componente reutilizado do artigo-base. Em laranja, as contribuições deste trabalho. A linha tracejada indica a supervisão usada no treino do codificador temporal e do decodificador.}
+\label{fig:pipeline}
+\end{figure*}
+
+\begin{table}[htbp]
+\caption{TerraFM original~\citep{danish2026terrafm} e TerraFM-Temporal}
+\begin{center}
+\footnotesize
+\begin{tabular}{|p{1.55cm}|p{2.85cm}|p{2.85cm}|}
+\hline
+ & \textbf{TerraFM (original)} & \textbf{TerraFM-Temporal (proposta)} \\
+\hline
+Entrada & uma data por amostra (S1+S2) & sequência de $T$ composições S1+S2 com datas \\
+Tempo & sem codificação temporal & codificação de data + máscara de lacunas \\
+Saída & rótulo de cena ou segmentação & sequência anual de floresta a 10~m, ano de início e idade \\
+Resolução & \textit{token} de 16$\times$16 px (160~m) & decodificador de volta a 10~m \\
+Treino & pré-treino autossupervisionado global & encoder congelado; cabeça temporal com rótulos fracos e de referência \\
+Aplicação & \textit{benchmarks} globais & fiscalização de APP em PSA (Extrema, MG) \\
+\hline
+\end{tabular}
+\label{tab:comparacao}
+\end{center}
+\end{table}
+
+\subsection{Por que esta inovação}
+
+\begin{itemize}
+\item \textbf{Regeneração é trajetória, não estado.} Uma imagem isolada não distingue com segurança uma capoeira jovem de um pasto sujo ou de uma floresta antiga. O que caracteriza a regeneração é a sequência ``não floresta $\rightarrow$ vegetação em crescimento $\rightarrow$ floresta estável'', que o TerraFM original não modela.
+\item \textbf{Nuvens na Mata Atlântica.} A estação chuvosa produz longas lacunas nas séries ópticas. O TerraFM já funde Sentinel-1, cujo radar não é afetado por nuvens. A proposta acrescenta o tratamento explícito de datas ausentes, inspirado no PYRREGULAR~\citep{spinnato2026pyrregular}.
+\item \textbf{Poucos rótulos de qualidade.} Rotular a idade da regeneração exige interpretação manual. Reaproveitar um modelo de fundação congelado e treinar apenas a parte temporal reduz o número de parâmetros ajustados e o custo computacional, viabilizando o projeto em uma GPU de 8~GB.
+\item \textbf{Classe rara.} Floresta jovem é minoritária na paisagem. O TerraFM foi projetado para lidar com distribuições de cauda longa, característica que se deseja preservar.
+\item \textbf{Aplicação real nova.} O TerraFM não foi avaliado em restauração florestal tropical nem em fiscalização de políticas públicas. A proposta se enquadra no tipo de projeto ``testar um modelo existente para uma aplicação real nova'', com uma modificação arquitetural mensurável.
+\end{itemize}
+
+\subsection{Como a inovação será observada}
+
+A contribuição será considerada demonstrada se o TerraFM-Temporal superar a baseline B4 (o TerraFM aplicado data a data, com o mesmo decodificador e os mesmos rótulos) no F1 da classe floresta jovem e no acerto do ano de início. Essa comparação isola o efeito da modelagem temporal. Ganhos adicionais em relação às baselines B1--B3 (Tabela~\ref{tab:baselines}) indicarão o valor do modelo de fundação em si. As ablações sobre a codificação de datas, a máscara de lacunas e o uso do Sentinel-1 indicarão quais componentes explicam o ganho.
+
+\textbf{Hipóteses:}
+\begin{itemize}
+\item \textbf{H1:} a modelagem temporal aumenta o F1 da classe floresta jovem em relação ao TerraFM aplicado a uma data;
+\item \textbf{H2:} a fusão Sentinel-1 + Sentinel-2 é mais robusta que o Sentinel-2 isolado nos anos com mais nuvens;
+\item \textbf{H3:} com 10\% dos rótulos de referência, o TerraFM-Temporal perde menos desempenho que redes temporais treinadas do zero.
+\end{itemize}
+
+% =====================================================================
+\section{Metodologia Planejada}\label{sec:metodologia}
+
+\subsection{Área de estudo e dados}
+
+A área principal é a sub-bacia do Ribeirão das Posses, em Extrema (MG), área-piloto do Conservador das Águas. Os municípios de Joanópolis e Nazaré Paulista (SP), atendidos pelo Produtor de Água na bacia PCJ, servirão como teste de transferência geográfica. Serão usadas imagens Sentinel-2 L2A e Sentinel-1 GRD (VV, VH) de 2017 a 2025, agregadas em duas a quatro composições por ano (estação seca e estação chuvosa), obtidas pelo Brazil Data Cube, pelo Google Earth Engine ou pelo Planetary Computer. Os limites das APPs virão da camada de APP do Cadastro Ambiental Rural (CAR) ou de faixas de proteção sobre a hidrografia, conforme o Código Florestal~\citep{brasil2012}. Os polígonos dos contratos serão solicitados à prefeitura de Extrema e à agência de bacia \pendente{confirmar disponibilidade}.
+
+\subsection{Rótulos}
+
+Como rótulos fracos, serão usadas a cobertura anual do MapBiomas~\citep{souza2020} e os mapas de idade da floresta secundária~\citep{silva2020}, ambos a 30~m. Como rótulos de referência, serão interpretados manualmente de 300 a 500 pontos, estratificados por classe e por ano de início. A interpretação usará o histórico de imagens de alta resolução do Google Earth.
+
+\subsection{Modelo}
+
+Para cada composição $t$, o recorte multissensor é codificado pelo TerraFM-B congelado, $\mathbf{Z}_t = E_\theta(\mathbf{x}^{\mathrm{S1}}_t, \mathbf{x}^{\mathrm{S2}}_t) \in \mathbb{R}^{196\times d}$, e as representações são pré-calculadas uma única vez. Para cada posição de \textit{token} $n$, o codificador temporal $G_\phi$ recebe a sequência $\{(\mathbf{z}_{n,t}, \mathbf{e}(\tau_t), m_{n,t})\}_{t=1}^{T}$. Nela, $\mathbf{e}(\tau_t)$ codifica o dia do ano, de forma senoidal, e o ano da aquisição, e $m_{n,t}$ mascara as composições ausentes. Duas variantes serão comparadas: uma atenção temporal leve, no estilo da L-TAE~\citep{garnot2020ltae}, e um bloco Mamba de camada única, inspirado no MambaSL~\citep{jung2026mambasl}. Um decodificador leve, do tipo FPN, combina a saída temporal com as bandas originais de 10~m, pois cada \textit{token} cobre 160~m e uma faixa de APP tem cerca de 30~m, e produz $\hat{y}_{p,a}$ para os $Y$ anos.
+
+\subsection{Treinamento}
+
+O treinamento segue a estratégia \textit{weak-to-gold}. Primeiro, o codificador temporal e o decodificador são pré-treinados com os rótulos fracos. Em seguida, são ajustados com os rótulos de referência. A perda é a entropia cruzada binária ponderada por classe,
+\begin{equation}
+\mathcal{L} = -\frac{1}{|\mathcal{B}|}\sum_{(p,a)\in\mathcal{B}} w_{c}\left[y_{p,a}\ln\hat{y}_{p,a} + (1-y_{p,a})\ln(1-\hat{y}_{p,a})\right],\label{eq:perda}
+\end{equation}
+em que $w_c$ compensa a raridade da classe floresta jovem. A diferença de resolução entre os rótulos (30~m) e a saída (10~m) será tratada como em \citet{silvafilho2024}. O TerraFM permanecerá congelado. Como extensão, serão testados o ajuste das últimas camadas ou de adaptadores de baixo posto (LoRA), caso a GPU permita.
+
+\subsection{Baselines, ablações e métricas}
+
+A Tabela~\ref{tab:baselines} resume as comparações planejadas. As ablações variam:
+\begin{enumerate}
+\item os sensores: apenas Sentinel-2 ou Sentinel-1 + Sentinel-2;
+\item o codificador temporal: L-TAE ou Mamba;
+\item o uso da codificação de datas e da máscara de lacunas;
+\item o encoder: congelado ou parcialmente ajustado;
+\item a fração dos rótulos de referência: 10\%, 50\% e 100\%.
+\end{enumerate}
+
+\begin{table}[htbp]
+\caption{Comparações planejadas}
+\begin{center}
+\footnotesize
+\begin{tabular}{|c|p{6.3cm}|}
+\hline
+\textbf{Id} & \textbf{Método} \\
+\hline
+B1 & LandTrendr/CCDC~\citep{kennedy2010,zhu2014} sobre NDVI/NBR $\rightarrow$ ano de início \\
+B2 & Random Forest sobre métricas temporais anuais~\citep{simoes2021} \\
+B3 & TempCNN~\citep{pelletier2019} e L-TAE~\citep{garnot2020ltae} sobre as bandas brutas, sem modelo de fundação \\
+B4 & TerraFM data a data (como no artigo original) + mesmo decodificador \\
+B5 & MapBiomas~\citep{souza2020} comparado aos rótulos de referência \\
+\textbf{P} & \textbf{TerraFM-Temporal (proposto)} \\
+\hline
+\end{tabular}
+\label{tab:baselines}
+\end{center}
+\end{table}
+
+As métricas serão:
+\begin{itemize}
+\item o F1 anual de floresta, com destaque para a classe floresta jovem;
+\item a acurácia do ano de início, exata e com tolerância de $\pm$1 ano;
+\item o erro absoluto médio da idade, em anos;
+\item a concordância do indicador $F_j$ com a avaliação de referência por APP.
+\end{itemize}
+A validação usará blocos espacialmente separados, para evitar a inflação da acurácia por autocorrelação espacial. As áreas de floresta em regeneração serão estimadas com intervalos de confiança, seguindo as boas práticas de \citet{olofsson2014}.
+
+\subsection{Ambiente e repositório}
+
+Os experimentos serão executados em Python/PyTorch, em uma GPU NVIDIA GeForce RTX 2070 Max-Q (8~GB) e, se necessário, no Google Colab. O código, os cadernos e as instruções de reprodução ficarão no repositório \url{https://github.com/Jibabk/ProjetoFinalRNAP_UnB2026} \pendente{criar repositório}.
+
+% =====================================================================
+\section{Cronograma}\label{sec:cronograma}
+
+A Tabela~\ref{tab:cronograma} apresenta o planejamento em semanas a partir desta entrega \pendente{ajustar às datas da disciplina}.
+
+\begin{table}[htbp]
+\caption{Cronograma planejado}
+\begin{center}
+\footnotesize
+\begin{tabular}{|c|p{6.3cm}|}
+\hline
+\textbf{Sem.} & \textbf{Atividades} \\
+\hline
+1 & Entrega deste roteiro; criação do repositório; verificação do TerraFM (ordem das bandas, normalização, formato da saída, licença) \\
+2 & Aquisição e composição das séries S1/S2; camada de APP; rótulos fracos do MapBiomas \\
+3 & Interpretação dos rótulos de referência; extração e armazenamento dos \textit{embeddings} \\
+4 & Baselines B1--B3 e B5 \\
+5 & Implementação do TerraFM-Temporal e da baseline B4 \\
+6 & Ablações, agregação por APP e análise dos resultados \\
+7 & Redação do artigo IEEE (6--8 páginas) e do relatório de uso de IA (2 páginas) \\
+8 & Preparação dos 4 \textit{slides} e apresentação oral de 5 minutos \\
+\hline
+\end{tabular}
+\label{tab:cronograma}
+\end{center}
+\end{table}
+
+% =====================================================================
+\section{Riscos e Mitigação}\label{sec:riscos}
+
+A Tabela~\ref{tab:riscos} lista os principais riscos identificados no planejamento e as ações previstas para mitigá-los. O risco mais crítico é a disponibilidade dos polígonos dos contratos, que define se a fiscalização poderá ser feita contrato a contrato ou apenas por APP.
+
+\begin{table}[htbp]
+\caption{Principais riscos}
+\begin{center}
+\footnotesize
+\begin{tabular}{|p{3.0cm}|p{4.6cm}|}
+\hline
+\textbf{Risco} & \textbf{Mitigação} \\
+\hline
+Repositório do TerraFM com documentação mínima e sem licença explícita & verificar as chaves dos pesos e a ordem das bandas na semana 1; consultar os autores; em último caso, usar outro modelo de fundação S1/S2 com pesos abertos \\
+\textit{Token} de 160~m maior que a faixa de APP & decodificador com as bandas originais de 10~m; alternativa: redimensionar recortes menores para 224$\times$224 \\
+Polígonos dos contratos indisponíveis & usar a camada de APP do CAR em toda a sub-bacia e tratar a fiscalização por contrato como estudo de caso \\
+Rótulos fracos ruidosos & treino \textit{weak-to-gold}; análise de erros contra os rótulos de referência \\
+Regenerações anteriores a 2017 & declarar o escopo; idade a partir do mapa MapBiomas~\citep{silva2020} \\
+Tempo e capacidade computacional & encoder congelado e \textit{embeddings} pré-calculados; área de estudo pequena \\
+\hline
+\end{tabular}
+\label{tab:riscos}
+\end{center}
+\end{table}
+
+% =====================================================================
+\section{Resultados Esperados}\label{sec:esperados}
+
+Espera-se obter:
+\begin{enumerate}
+\item um conjunto de dados com séries S1/S2, rótulos fracos e rótulos de referência para a sub-bacia do Ribeirão das Posses;
+\item uma implementação aberta do TerraFM-Temporal;
+\item uma comparação quantitativa com baselines clássicas e profundas que responda à pergunta de pesquisa;
+\item mapas de idade da regeneração e um indicador de conformidade por APP, discutidos à luz da avaliação manual de \citet{ruggiero2019}.
+\end{enumerate}
+Um resultado em que o ganho do modelo temporal seja pequeno também será informativo, pois indicará até onde representações de uma única data são suficientes para essa tarefa.
+
+% =====================================================================
+\section*{Uso de Ferramentas de Inteligência Artificial}
+
+A elaboração deste roteiro contou com o assistente Claude (Anthropic), por meio do Claude Cowork, com o modelo configurado \texttt{claude-opus-5-5}. O assistente apoiou:
+\begin{itemize}
+\item a busca e a triagem de literatura, com o conector FastTrack Literature Open, baseado em OpenAlex e Semantic Scholar;
+\item a verificação, nas páginas da conferência, dos artigos publicados na ICLR 2026;
+\item a leitura do artigo e do repositório do TerraFM;
+\item a estruturação deste documento em \LaTeX.
+\end{itemize}
+A escolha do tema, as decisões de projeto e a revisão do conteúdo são do autor. O uso detalhado será descrito no relatório específico exigido pela disciplina.
+
+% =====================================================================
+\renewcommand{\refname}{Referências}
+\begin{thebibliography}{99}
+\footnotesize
+
+\bibitem[ANA(2018)]{ana2018} AGÊNCIA NACIONAL DE ÁGUAS E SANEAMENTO BÁSICO (ANA). \textbf{Programa Produtor de Água}: nota informativa. Brasília: ANA, 2018. Disponível em: \url{https://www.gov.br/ana/pt-br/todos-os-documentos-do-portal/documentos-sip/produtor-de-agua/documentos-relacionados/1-nota-informativa-programa-produtor-de-agua.pdf}. Acesso em: 4 nov. 2026.
+
+\bibitem[BAUDCHON et~al.(2026)]{baudchon2026selvabox} BAUDCHON, H. \textit{et al}. SelvaBox: a high-resolution dataset for tropical tree crown detection. In: INTERNATIONAL CONFERENCE ON LEARNING REPRESENTATIONS, 14., 2026, Rio de Janeiro. \textbf{Proceedings} [...]. [\textit{S.~l.}]: ICLR, 2026. Disponível em: \url{https://openreview.net/forum?id=GH7z1RURL6}. Acesso em: 4 nov. 2026.
+
+\bibitem[BRASIL(2012)]{brasil2012} BRASIL. Lei nº 12.651, de 25 de maio de 2012. Dispõe sobre a proteção da vegetação nativa. \textbf{Diário Oficial da União}, Brasília, DF, 2012.
+
+\bibitem[CARON et~al.(2021)]{caron2021} CARON, M. \textit{et al}. Emerging properties in self-supervised vision transformers. In: IEEE/CVF INTERNATIONAL CONFERENCE ON COMPUTER VISION (ICCV), 2021. \textbf{Proceedings} [...]. [\textit{S.~l.}]: IEEE, 2021. p.~9650--9660.
+
+\bibitem[COMITÊS PCJ({[s.d.]})]{pcj_conservador} COMITÊS PCJ. \textbf{Programa Conservador das Águas}: Extrema-MG. [\textit{S.~l.}], [s.d.]. Disponível em: \url{https://www.comitespcj.org.br/images/Download/Programa-Conservador-Aguas_Extrema-MG.pdf}. Acesso em: 4 nov. 2026.
+
+\bibitem[DANISH et~al.(2026)]{danish2026terrafm} DANISH, M. S.; MUNIR, M. A.; SHAH, S. R. A.; KHAN, M. H.; ANWER, R. M.; LAAKSONEN, J.; KHAN, F. S.; KHAN, S. TerraFM: a scalable foundation model for unified multisensor Earth observation. In: INTERNATIONAL CONFERENCE ON LEARNING REPRESENTATIONS, 14., 2026, Rio de Janeiro. \textbf{Proceedings} [...]. [\textit{S.~l.}]: ICLR, 2026. Disponível em: \url{https://openreview.net/forum?id=cBxuzdUDNx}. Código: \url{https://github.com/mbzuai-oryx/TerraFM}. Acesso em: 4 nov. 2026.
+
+\bibitem[DOSOVITSKIY et~al.(2021)]{dosovitskiy2021} DOSOVITSKIY, A. \textit{et al}. An image is worth 16x16 words: transformers for image recognition at scale. In: INTERNATIONAL CONFERENCE ON LEARNING REPRESENTATIONS, 9., 2021. \textbf{Proceedings} [...]. [\textit{S.~l.}]: ICLR, 2021.
+
+\bibitem[DRUSCH et~al.(2012)]{drusch2012} DRUSCH, M. \textit{et al}. Sentinel-2: ESA's optical high-resolution mission for GMES operational services. \textbf{Remote Sensing of Environment}, v.~120, p.~25--36, 2012.
+
+\bibitem[GARNOT; LANDRIEU(2020)]{garnot2020ltae} GARNOT, V. S. F.; LANDRIEU, L. Lightweight temporal self-attention for classifying satellite images time series. In: ADVANCED ANALYTICS AND LEARNING ON TEMPORAL DATA (AALTD), 2020. \textbf{Lecture Notes in Computer Science}. Cham: Springer, 2020. DOI: 10.1007/978-3-030-65742-0\_12.
+
+\bibitem[GU; DAO(2023)]{gu2023mamba} GU, A.; DAO, T. Mamba: linear-time sequence modeling with selective state spaces. \textbf{arXiv}, 2312.00752, 2023.
+
+\bibitem[JUNG; KIM(2026)]{jung2026mambasl} JUNG, Y.-M.; KIM, L. MambaSL: exploring single-layer Mamba for time series classification. In: INTERNATIONAL CONFERENCE ON LEARNING REPRESENTATIONS, 14., 2026, Rio de Janeiro. \textbf{Proceedings} [...]. [\textit{S.~l.}]: ICLR, 2026. Disponível em: \url{https://iclr.cc/virtual/2026/poster/10008907}. Acesso em: 4 nov. 2026.
+
+\bibitem[KENNEDY; YANG; COHEN(2010)]{kennedy2010} KENNEDY, R. E.; YANG, Z.; COHEN, W. B. Detecting trends in forest disturbance and recovery using yearly Landsat time series: 1. LandTrendr --- Temporal segmentation algorithms. \textbf{Remote Sensing of Environment}, v.~114, n.~12, p.~2897--2910, 2010.
+
+\bibitem[MILLER; PELLETIER; WEBB(2024)]{miller2024} MILLER, L.; PELLETIER, C.; WEBB, G. I. Deep learning for satellite image time-series analysis: a review. \textbf{IEEE Geoscience and Remote Sensing Magazine}, 2024. DOI: 10.1109/MGRS.2024.3393010.
+
+\bibitem[OLOFSSON et~al.(2014)]{olofsson2014} OLOFSSON, P. \textit{et al}. Good practices for estimating area and assessing accuracy of land change. \textbf{Remote Sensing of Environment}, v.~148, p.~42--57, 2014.
+
+\bibitem[PASQUARELLA et~al.(2022)]{pasquarella2022} PASQUARELLA, V. J. \textit{et al}. Demystifying LandTrendr and CCDC temporal segmentation. \textbf{International Journal of Applied Earth Observation and Geoinformation}, art. 102806, 2022. DOI: 10.1016/j.jag.2022.102806.
+
+\bibitem[PELLETIER; WEBB; PETITJEAN(2019)]{pelletier2019} PELLETIER, C.; WEBB, G. I.; PETITJEAN, F. Temporal convolutional neural network for the classification of satellite image time series. \textbf{Remote Sensing}, v.~11, n.~5, art. 523, 2019.
+
+\bibitem[RUGGIERO(2019)]{ruggiero2019} RUGGIERO, P. G. C. \textbf{Impacts of conservation policies and electoral cycles on protected areas and forest cover in the Brazilian Atlantic Forest}. 2019. Tese (Doutorado) --- Instituto de Biociências, Universidade de São Paulo, São Paulo, 2019. DOI: 10.11606/T.41.2019.tde-13122018-104400.
+
+\bibitem[SILVA et~al.(2020)]{silva2020} SILVA, C. H. L. \textit{et al}. Benchmark maps of 33 years of secondary forest age for Brazil. \textbf{Scientific Data}, v.~7, 2020. DOI: 10.1038/s41597-020-00600-4.
+
+\bibitem[SILVA FILHO et~al.(2024)]{silvafilho2024} SILVA FILHO, P. F. F. \textit{et al}. Mapping the Brazilian savanna's natural vegetation: a SAR-optical uncertainty-aware deep learning approach. \textbf{ISPRS Journal of Photogrammetry and Remote Sensing}, 2024. DOI: 10.1016/j.isprsjprs.2024.09.019.
+
+\bibitem[SIMÕES et~al.(2021)]{simoes2021} SIMÕES, R. \textit{et al}. Satellite image time series analysis for big Earth observation data. \textbf{Remote Sensing}, v.~13, n.~13, art. 2428, 2021.
+
+\bibitem[SOUZA JR. et~al.(2020)]{souza2020} SOUZA JR., C. M. \textit{et al}. Reconstructing three decades of land use and land cover changes in Brazilian biomes with Landsat archive and Earth Engine. \textbf{Remote Sensing}, v.~12, n.~17, art. 2735, 2020.
+
+\bibitem[SPINNATO; LANDI(2026)]{spinnato2026pyrregular} SPINNATO, F.; LANDI, C. PYRREGULAR: a unified framework for irregular time series, with classification benchmarks. In: INTERNATIONAL CONFERENCE ON LEARNING REPRESENTATIONS, 14., 2026, Rio de Janeiro. \textbf{Proceedings} [...]. [\textit{S.~l.}]: ICLR, 2026. Disponível em: \url{https://openreview.net/forum?id=qetBM8nLkf}. Acesso em: 4 nov. 2026.
+
+\bibitem[TORRES et~al.(2012)]{torres2012} TORRES, R. \textit{et al}. GMES Sentinel-1 mission. \textbf{Remote Sensing of Environment}, v.~120, p.~9--24, 2012.
+
+\bibitem[TOTO et~al.(2025)]{toto2025} TOTO, R. \textit{et al}. Evidence on scaling forest restoration from the Atlantic Forest Restoration Pact in Brazil. \textbf{Nature Communications}, v.~16, 2025. DOI: 10.1038/s41467-025-59194-3.
+
+\bibitem[VIANI et~al.(2019)]{viani2019} VIANI, R. A. G. \textit{et al}. Lessons learned from the Water Producer Project in the Atlantic Forest, Brazil. \textbf{Forests}, v.~10, n.~11, art. 1031, 2019.
+
+\bibitem[WERNER et~al.(2024)]{werner2024} WERNER, J. P. S. \textit{et al}. Mapping integrated crop--livestock systems using fused Sentinel-2 and PlanetScope time series and deep learning. \textbf{Remote Sensing}, v.~16, n.~8, art. 1421, 2024.
+
+\bibitem[ZHANG et~al.(2023)]{zhang2023} ZHANG, S. \textit{et al}. Mapping the age of subtropical secondary forest using dense Landsat time series data: an ensemble model. \textbf{Remote Sensing}, v.~15, n.~8, art. 2067, 2023.
+
+\bibitem[ZHU; WOODCOCK(2014)]{zhu2014} ZHU, Z.; WOODCOCK, C. E. Continuous change detection and classification of land cover using all available Landsat data. \textbf{Remote Sensing of Environment}, v.~144, p.~152--171, 2014.
+
+\end{thebibliography}
+
+\end{document}
