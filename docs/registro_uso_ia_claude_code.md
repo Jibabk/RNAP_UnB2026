@@ -175,3 +175,32 @@ Objetivo: documentar de forma específica e detalhada o uso de modelos de IA no 
     - triagem dos itens estacionados da revisão final (R18).
   - **Ambiente:** o `conda init` continua pendente, e o `conda` não está no PATH dos shells.
   - **Registro principal:** o `claude/registro-uso-ia.md` do Projeto "TCC Jean" não foi atualizado, porque as ferramentas de Projects não estão disponíveis no Claude Code.
+
+### [2026-11-25] Correção do dtype das bandas do BDC e do comando de teste
+- **Etapa:** ambiente
+- **Ferramenta:** Claude Code (VS Code), modelo `claude-opus-5-5`, sem subagentes.
+- **Pedido do aluno:**
+  - "push e o merge devem ser feitos apenas quando aprovados pelo usuário";
+  - "a correção deve entrar nesta branch" (I1, da revisão final da F0);
+  - "entre junto com a do item 2" (M6).
+- **O que a IA fez:**
+  - Conferiu o dtype no BDC antes de editar, com um script no scratchpad (`pystac-client` + `rasterio`, env `rnap`), sobre o item `S2-16D_V2_029030_20240625`:
+    - B01, B04, B08 e B12 estão em `int16` no COG, com nodata 0;
+    - o STAC declara `data_type: uint16` em `eo:bands`, com min 0 e max 10000;
+    - `PROVENANCE` está em `int16`, com nodata −1; SCL, CLEAROB e TOTALOB estão em `uint8`.
+  - Corrigiu o texto em três lugares:
+    - `CLAUDE.md`, item "Bandas": int16 no COG, uint16 no STAC, converter para uint16 na leitura depois de checar negativos, e `PROVENANCE` em int16 com nodata −1;
+    - `CLAUDE.md` e `docs/PLANO_IMPLEMENTACAO.md` §4.1: "o uint16 do BDC" virou "o DN do BDC";
+    - `docs/PLANO_IMPLEMENTACAO.md` §3.2: as bandas estão "gravadas em int16 (o STAC declara uint16)".
+  - Corrigiu o comando de teste no `CLAUDE.md`: para pular os testes de rede e os de GPU juntos, um só `-m "not network and not gpu"`.
+  - Conferiu a correção com o pytest:
+    - `-m "not network" -m "not gpu"` deu `58 passed, 3 deselected`, ou seja, só o último `-m` valeu;
+    - `-m "not network and not gpu"` deu `55 passed, 6 deselected`;
+    - 6 testes têm os marcadores `network` ou `gpu`.
+  - Manteve como estavam a linha 79 do PLANO e o `geo-data.md`, que guardam `x` em uint16 no Zarr local. Os dois já seguem a regra de converter na leitura.
+  - Não fez push nem merge.
+- **Resultado:** um commit de documentação na branch `f0-ambiente`.
+- **Verificação humana:** a preencher pelo aluno
+- **Limitações/erros:**
+  - O dtype foi conferido em um único item do BDC. Não foi verificado se todos os itens de 2017–2025 seguem o mesmo padrão.
+  - "Sem negativos" vem do intervalo declarado no STAC (0 a 10000) e da checagem numa janela, no teste da Tarefa 5. Não foi conferido na imagem inteira.

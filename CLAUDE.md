@@ -33,12 +33,12 @@ O projeto fiscaliza a restauração de APPs no Conservador das Águas, em Extrem
   - terminal interativo: `conda activate rnap`;
   - scripts: `conda run -n rnap --no-capture-output python scripts/<NN>_<nome>.py --config configs/<arquivo>.yaml`;
   - pesos do TerraFM-B: `conda run -n rnap --no-capture-output python scripts/00_download_weights.py --config configs/model/terrafm.yaml`;
-  - testes: `conda run -n rnap --no-capture-output python -m pytest tests -q`. Sem rede, acrescente `-m "not network"`; sem GPU, `-m "not gpu"`.
+  - testes: `conda run -n rnap --no-capture-output python -m pytest tests -q`. Sem rede, acrescente `-m "not network"`; sem GPU, `-m "not gpu"`; sem os dois, um só `-m "not network and not gpu"` (com dois `-m`, o pytest usa só o último).
 
 ## Fatos técnicos já verificados (não redescobrir)
 - **BDC:**
   - STAC: `https://data.inpe.br/bdc/stac/v1/`, coleção `S2-16D-2` (composições LCF de 16 dias, 10 m, de 2017-01-01 em diante, grade `BDC_SM_V2`, projeção Albers).
-  - Bandas: `B01 B02 B03 B04 B05 B06 B07 B08 B8A B09 B11 B12`, em uint16 com escala 1e-4 e nodata 0.
+  - Bandas: `B01 B02 B03 B04 B05 B06 B07 B08 B8A B09 B11 B12`, com escala 1e-4 e nodata 0. O STAC declara uint16 (`eo:bands`, DN de 0 a 10000), mas os COGs estão gravados em int16 (conferido em 25/11/2026 no item `S2-16D_V2_029030_20240625`). Converta para uint16 na leitura, depois de checar que não há negativos. `PROVENANCE` é int16 com nodata −1.
   - Auxiliares: `SCL`, `CLEAROB` (0 = sem observação limpa) e `PROVENANCE` (dia do ano da aquisição escolhida).
   - **Não há Sentinel-1 no BDC.**
   - Os assets abrem sem token: um GET parcial de um COG respondeu 206 em 25/11/2026.
@@ -47,7 +47,7 @@ O projeto fiscaliza a restauração de APPs no Conservador das Águas, em Extrem
   - `forward(x, is_l2a=False)` recebe **um sensor por vez** (2 canais = S1, 12 canais = S2) e devolve **só o token CLS**.
   - Todos os métodos usam `is_l2a=False` (stem **L1C**) por padrão. Para o BDC (L2A), passe sempre `is_l2a=True`.
   - Tokens de patch: `get_intermediate_layers(x, n=1, is_l2a=True, norm=True)` (196×768). Sem `norm=True`, eles saem antes da LayerNorm final.
-  - Normalização oficial: `normalize(x, "s2_l2a")` sobre DN brutos (refletância×10000, o uint16 do BDC sem aplicar a escala). O README desaconselha o z-score por conjunto de dados.
+  - Normalização oficial: `normalize(x, "s2_l2a")` sobre DN brutos (refletância×10000, o DN do BDC sem aplicar a escala). O README desaconselha o z-score por conjunto de dados.
   - Ordem das bandas (`S2_BANDS`): `B01…B08, B8A, B09, B11, B12`, a mesma do BDC.
   - O código público não tem a fusão S1/S2 por atenção cruzada.
 - **MapBiomas Coleção 11** (30 m, anual): 3 = Formação Florestal (alvo); 9 = Silvicultura (**não** é floresta nativa); 15 = Pastagem; 21 = Mosaico; 12 = Formação Campestre; 11 = Campo Alagado. O download pelo site está suspenso, e os dados saem pelo GEE.

@@ -67,7 +67,7 @@
 
 ### 3.2 Imagens: BDC `S2-16D-2`
 - **Produto:** "Sentinel-2/MSI – Level-2A – Data Cube – LCF 16 days". As composições são de 16 dias, com o pixel de menor cobertura de nuvem (*Least Cloud Cover First*). Período: de 2017-01-01 até hoje. Pixel de 10 m.
-- **Bandas (12):** `B01 B02 B03 B04 B05 B06 B07 B08 B8A B09 B11 B12`, em uint16, com escala 0,0001 e nodata 0. São exatamente os 12 canais que o ramo S2 do TerraFM espera.
+- **Bandas (12):** `B01 B02 B03 B04 B05 B06 B07 B08 B8A B09 B11 B12`, gravadas em int16 (o STAC declara uint16), com DN de 0 a 10000, escala 0,0001 e nodata 0. São exatamente os 12 canais que o ramo S2 do TerraFM espera.
 - **Auxiliares:**
   - `SCL`, a classificação de cena;
   - `CLEAROB`, o número de observações limpas (0 = sem observação válida);
@@ -124,7 +124,7 @@
   - `forward()` aceita **um sensor por vez** (2 canais = S1, 12 = S2) e devolve **só o CLS**.
   - Todos os métodos usam `is_l2a=False` (stem **L1C**) por padrão. Para L2A, passar `is_l2a=True`.
   - Os tokens de patch vêm de `get_intermediate_layers(x, n=1, is_l2a=True, norm=True)` (196×768) ou de `extract_feature(..., out_indices=[3,5,7,11], is_l2a=True)` (mapas 14×14). Sem `norm=True`, os tokens saem antes da LayerNorm final.
-- **Normalização e ordem de bandas:** ambas são oficiais desde o commit `e245c347`. A entrada são DN brutos (refletância×10000, o uint16 do BDC sem aplicar a escala), normalizados com `normalize(x, "s2_l2a")`, na ordem `S2_BANDS` = `B01…B08, B8A, B09, B11, B12`, que é a mesma do BDC. O README desaconselha o z-score por conjunto de dados. A sondagem da seção 4.7 confirma essa escolha.
+- **Normalização e ordem de bandas:** ambas são oficiais desde o commit `e245c347`. A entrada são DN brutos (refletância×10000, o DN do BDC sem aplicar a escala), normalizados com `normalize(x, "s2_l2a")`, na ordem `S2_BANDS` = `B01…B08, B8A, B09, B11, B12`, que é a mesma do BDC. O README desaconselha o z-score por conjunto de dados. A sondagem da seção 4.7 confirma essa escolha.
 - **Validade do token:** ≥50% de pixels limpos no patch de 16×16 (`CLEAROB>0` e SCL ∉ {0,1,3,8,9,10}).
 
 ### 4.2 Modelo proposto P (TerraFM-Temporal)
