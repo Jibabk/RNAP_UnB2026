@@ -1,0 +1,10 @@
+# Mini-AOI de desenvolvimento (CLAUDE.md: 1 recorte × 1 ano). Coordenadas WGS84.
+# Ponto escolhido em 25/11/2026: uma janela de 224 px (2,24 km) mais 1 km de margem fica
+# dentro do limite do IBGE para Extrema (3125101) e inteira no tile BDC 029030.
+# A F1 confirma que o ponto fica fora das Posses + 500 m e alinha o recorte à grade BDC_SM_V2.
+mini:
+  center_lon: -46.35
+  center_lat: -22.85
+  size_px: 224
+  year: 2024
+  bdc_tile: "029030"

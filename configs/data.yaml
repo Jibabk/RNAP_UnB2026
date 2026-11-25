@@ -1,0 +1,14 @@
+# Configuração de dados (PLANO §3). Caminhos relativos à raiz do repositório.
+paths:
+  data_root: data          # dados baixados e derivados (não versionado)
+  logs: outputs/logs       # logs de comandos longos (não versionado)
+
+# Imagens: BDC S2-16D-2 (PLANO §3.2)
+bdc:
+  stac_url: https://data.inpe.br/bdc/stac/v1/
+  collection: S2-16D-2
+  # Ordem dos canais esperada pelo ramo S2 do TerraFM
+  bands: [B01, B02, B03, B04, B05, B06, B07, B08, B8A, B09, B11, B12]
+  aux: [SCL, CLEAROB, TOTALOB, PROVENANCE]
+  scale: 0.0001            # reflectância = DN * scale; o Zarr guarda o DN, sem aplicar a escala
+  nodata: 0
